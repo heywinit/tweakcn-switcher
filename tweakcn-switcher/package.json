@@ -1,0 +1,45 @@
+{
+  "name": "tweakcn-switcher",
+  "version": "0.1.0",
+  "description": "Runtime theme switcher for tweakcn JSON presets (shadcn/ui friendly)",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "test": "vitest"
+  },
+  "keywords": [
+    "tweakcn",
+    "shadcn",
+    "theme",
+    "dark-mode",
+    "react",
+    "nextjs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jnsahaj/tweakcn-switcher.git"
+  },
+  "author": "jnsahaj",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=17 || >=18",
+    "react-dom": ">=17 || >=18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "rimraf": "^5.0.0",
+    "vitest": "^1.5.0"
+  }
+}
