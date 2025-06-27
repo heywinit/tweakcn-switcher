@@ -1,0 +1,44 @@
+# Source files
+src/
+tsconfig.json
+tsup.config.ts
+
+# Development files
+.eslintrc.js
+.prettierrc
+
+# Git
+.git/
+.gitignore
+
+# Testing
+test/
+tests/
+__tests__/
+*.test.*
+*.spec.*
+coverage/
+
+# Documentation
+docs/
+examples/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment
+.env*
+
+# Temporary
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db 
