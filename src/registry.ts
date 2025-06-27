@@ -1,6 +1,6 @@
 import { TweakcnTheme } from "./types";
 
-const DEFAULT_REGISTRY_URL = "https://tweakcn.com/api/themes";
+const DEFAULT_REGISTRY_URL = "https://tweakcn.com/r/themes";
 
 export class ThemeRegistry {
   private cache = new Map<string, TweakcnTheme>();
