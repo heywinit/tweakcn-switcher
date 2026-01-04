@@ -1,5 +1,4 @@
 import { TweakcnSwitcher } from "@/components/tweakcn-switcher";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
@@ -13,41 +12,23 @@ function HomeComponent() {
         <TweakcnSwitcher
           defaultThemes={[
             {
-              id: "amethyst-haze",
-              name: "Amethyst Haze",
-              url: "https://tweakcn.com/r/themes/amethyst-haze.json",
+              id: "caffeine",
+              name: "Caffeine",
+              url: "https://tweakcn.com/r/themes/caffeine.json",
+            },
+            {
+              id: "darkmatter",
+              name: "Darkmatter",
+              url: "https://tweakcn.com/r/themes/darkmatter.json",
+            },
+            {
+              id: "tangerine",
+              name: "Tangerine",
+              url: "https://tweakcn.com/r/themes/tangerine.json",
             },
           ]}
         />
       </div>
-
-      <Card className="w-full max-w-3xl">
-        <CardHeader>
-          <CardTitle>Tweakcn Switcher Demo</CardTitle>
-          <CardDescription>A component for switching shadcn/ui themes</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Features</h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              <li>Switch between multiple themes</li>
-              <li>Add custom themes via URL</li>
-              <li>Toggle between light and dark modes</li>
-              <li>Persistent theme selection</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Try it out</h3>
-            <p className="text-sm text-muted-foreground">
-              Click the palette icon in the top right to open the theme switcher. You can add a
-              theme by entering a URL like:
-              <code className="block mt-2 p-2 bg-muted rounded text-xs">
-                https://tweakcn.com/r/themes/amethyst-haze.json
-              </code>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

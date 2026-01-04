@@ -103,9 +103,9 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
           </Button>
         }
       />
-      <DropdownMenuContent align={align} className="w-96">
+      <DropdownMenuContent align={align} className="w-48">
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex items-center justify-between">
+          <DropdownMenuLabel className="flex items-center justify-between py-1 pl-2 pr-1">
             <span>Themes</span>
             <div className="flex items-center gap-1">
               <Button
@@ -127,7 +127,7 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
           {error && <div className="px-2 py-1.5 text-xs text-destructive">{error}</div>}
 
           {showInput ? (
-            <div className="px-2 py-1.5 space-y-2">
+            <div className="px-2 py-1.5 space-y-1">
               <Input
                 placeholder="Theme title (optional)"
                 value={title}
@@ -137,25 +137,25 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
               />
               <div className="flex gap-1 mb-1">
                 <Button
-                  variant={inputMode === "url" ? "default" : "ghost"}
+                  variant={inputMode === "url" ? "default" : "outline"}
                   size="xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     setInputMode("url");
                   }}
-                  className="h-6 flex-1 text-xs"
+                  className={`h-6 flex-1 text-xs ${inputMode === "url" ? "border border-primary" : ""}`}
                 >
                   <Link className="size-3 mr-1" />
                   URL
                 </Button>
                 <Button
-                  variant={inputMode === "css" ? "default" : "ghost"}
+                  variant={inputMode === "css" ? "default" : "outline"}
                   size="xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     setInputMode("css");
                   }}
-                  className="h-6 flex-1 text-xs"
+                  className={`h-6 flex-1 text-xs ${inputMode === "css" ? "border border-primary" : ""}`}
                 >
                   <Code className="size-3 mr-1" />
                   CSS
@@ -185,14 +185,13 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
               )}
               <div className="flex gap-1">
                 <Button
-                  variant="default"
                   size="xs"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleAddTheme();
                   }}
                   disabled={isAddingTheme || !input.trim()}
-                  className="flex-1 h-6"
+                  className="flex-1 h-6 border border-primary"
                 >
                   {isAddingTheme ? (
                     <Loader2 className="size-3 animate-spin" />
@@ -202,7 +201,7 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
                   Add
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="xs"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -260,19 +259,12 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
               )}
             </>
           )}
-
-          {isLoading && (
-            <div className="px-2 py-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" />
-              Loading theme...
-            </div>
-          )}
         </DropdownMenuGroup>
 
         {!showInput && (
           <>
             <DropdownMenuSeparator />
-            <div className="px-2 py-1.5">
+            <div className="">
               <Button
                 variant="ghost"
                 size="xs"
