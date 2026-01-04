@@ -19,7 +19,8 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
-    "check": "oxlint && oxfmt --write"
+    "check": "oxlint && oxfmt --write",
+    "generate:registry": "tsx scripts/generate-registry.ts"
   },
   "dependencies": {
     "@tweakcn-switcher/env": "workspace:*",
