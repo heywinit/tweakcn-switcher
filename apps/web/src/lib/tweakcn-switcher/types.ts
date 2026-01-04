@@ -21,7 +21,8 @@ export interface ThemeRegistryItem {
 export interface ThemeOption {
   id: string;
   name: string;
-  url: string;
+  url?: string;
+  css?: string;
   preview?: string;
 }
 

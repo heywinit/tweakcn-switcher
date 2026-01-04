@@ -4,7 +4,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ThemeRegistryItem, ThemeOption, TweakcnSwitcherConfig } from "./types";
-import { applyThemeFromRegistry, fetchThemeFromUrl, extractThemeNameFromUrl } from "./utils";
+import {
+  applyThemeFromRegistry,
+  fetchThemeFromUrl,
+  extractThemeNameFromUrl,
+  validateUrl,
+  parseCssToThemeRegistryItem,
+  isCssCode,
+} from "./utils";
 
 export interface UseTweakcnSwitcherReturn {
   currentTheme: ThemeOption | null;
@@ -39,33 +46,55 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   }, [mode]);
 
   const applyTheme = useCallback(
-    async (url: string, overrideMode?: "light" | "dark") => {
+    async (urlOrCss: string, overrideMode?: "light" | "dark") => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const registryItem = await fetchThemeFromUrl(url);
+        let registryItem: ThemeRegistryItem;
+        let themeName: string;
+        let themeId: string;
+        let themeOption: ThemeOption;
+
+        if (isCssCode(urlOrCss)) {
+          // Handle CSS code
+          registryItem = parseCssToThemeRegistryItem(urlOrCss, "custom-css-theme");
+          themeName = registryItem.name;
+          themeId = `css-theme-${Date.now()}`;
+
+          themeOption = {
+            id: themeId,
+            name: themeName,
+            css: urlOrCss,
+          };
+        } else {
+          // Handle URL
+          registryItem = await fetchThemeFromUrl(urlOrCss);
+          themeName = registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          themeId = `theme-${themeName}`;
+
+          themeOption = {
+            id: themeId,
+            name: themeName,
+            url: urlOrCss,
+          };
+        }
+
         setCurrentRegistryItem(registryItem);
         const currentMode = overrideMode ?? modeRef.current;
-        applyThemeFromRegistry(registryItem, currentMode);
-
-        // Find or create theme option
-        const themeName = registryItem.name || extractThemeNameFromUrl(url);
-        const themeId = `theme-${themeName}`;
+        await applyThemeFromRegistry(registryItem, currentMode);
 
         setThemes((prev) => {
-          let themeOption = prev.find((t) => t.url === url);
-          if (!themeOption) {
-            themeOption = {
-              id: themeId,
-              name: themeName,
-              url,
-            };
+          // Check if theme already exists (by URL or CSS content)
+          const existing = prev.find(
+            (t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss),
+          );
+          if (!existing) {
             const updated = [...prev, themeOption];
             setCurrentTheme(themeOption);
             return updated;
           }
-          setCurrentTheme(themeOption);
+          setCurrentTheme(existing);
           return prev;
         });
 
@@ -73,7 +102,11 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
         if (persist) {
           localStorage.setItem(
             storageKey,
-            JSON.stringify({ url, mode: currentMode, name: themeName }),
+            JSON.stringify({
+              ...(isCssCode(urlOrCss) ? { css: urlOrCss } : { url: urlOrCss }),
+              mode: currentMode,
+              name: themeName,
+            }),
           );
         }
       } catch (err) {
@@ -98,30 +131,61 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
           if (savedTheme.mode) {
             setMode(savedTheme.mode);
           }
-          if (savedTheme.url) {
-            // Apply theme with the saved mode
-            applyTheme(savedTheme.url, savedTheme.mode).catch(console.error);
+          if (savedTheme.url || savedTheme.css) {
+            if (savedTheme.css) {
+              // Apply CSS theme
+              applyTheme(savedTheme.css, savedTheme.mode).catch((err) => {
+                console.error("Failed to load saved theme:", err);
+                // Clear invalid saved theme
+                localStorage.removeItem(storageKey);
+              });
+            } else if (savedTheme.url) {
+              // Validate URL before attempting to apply
+              const validation = validateUrl(savedTheme.url);
+              if (validation.valid) {
+                // Apply theme with the saved mode
+                applyTheme(savedTheme.url, savedTheme.mode).catch((err) => {
+                  console.error("Failed to load saved theme:", err);
+                  // Clear invalid saved theme
+                  localStorage.removeItem(storageKey);
+                });
+              } else {
+                // Clear invalid saved theme
+                console.warn("Invalid saved theme URL, clearing:", validation.error);
+                localStorage.removeItem(storageKey);
+              }
+            }
           }
         } catch (e) {
           console.error("Failed to load saved theme:", e);
+          // Clear corrupted saved theme
+          localStorage.removeItem(storageKey);
         }
       } else {
         isInitialMount.current = false;
       }
     }
-  }, [persist, storageKey]);
+  }, [persist, storageKey, applyTheme]);
 
   // Apply mode changes to current theme
   useEffect(() => {
     if (currentRegistryItem) {
-      applyThemeFromRegistry(currentRegistryItem, mode);
+      applyThemeFromRegistry(currentRegistryItem, mode).catch(console.error);
       // Update localStorage with new mode if persist is enabled
       if (persist && currentTheme) {
         const saved = localStorage.getItem(storageKey);
         if (saved) {
           try {
             const savedTheme = JSON.parse(saved);
-            localStorage.setItem(storageKey, JSON.stringify({ ...savedTheme, mode }));
+            localStorage.setItem(
+              storageKey,
+              JSON.stringify({
+                ...savedTheme,
+                mode,
+                ...(currentTheme.css ? { css: currentTheme.css } : {}),
+                ...(currentTheme.url ? { url: currentTheme.url } : {}),
+              }),
+            );
           } catch (e) {
             console.error("Failed to update saved theme mode:", e);
           }
@@ -132,37 +196,65 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
 
   const applyThemeOption = useCallback(
     async (theme: ThemeOption) => {
-      await applyTheme(theme.url);
+      if (theme.css) {
+        await applyTheme(theme.css);
+      } else if (theme.url) {
+        await applyTheme(theme.url);
+      }
     },
     [applyTheme],
   );
 
-  const addTheme = useCallback(async (url: string, name?: string): Promise<ThemeOption | null> => {
-    try {
-      const registryItem = await fetchThemeFromUrl(url);
-      const themeName = name || registryItem.name || extractThemeNameFromUrl(url);
-      const themeId = `theme-${themeName}`;
+  const addTheme = useCallback(
+    async (urlOrCss: string, name?: string): Promise<ThemeOption | null> => {
+      setError(null); // Clear any previous errors
+      try {
+        let registryItem: ThemeRegistryItem;
+        let themeName: string;
+        let themeId: string;
+        let newTheme: ThemeOption;
 
-      const newTheme: ThemeOption = {
-        id: themeId,
-        name: themeName,
-        url,
-      };
+        if (isCssCode(urlOrCss)) {
+          // Handle CSS code
+          registryItem = parseCssToThemeRegistryItem(urlOrCss, name || "custom-css-theme");
+          themeName = name || registryItem.name;
+          themeId = `css-theme-${Date.now()}`;
 
-      setThemes((prev) => {
-        if (prev.some((t) => t.url === url)) {
-          return prev;
+          newTheme = {
+            id: themeId,
+            name: themeName,
+            css: urlOrCss,
+          };
+        } else {
+          // Handle URL
+          registryItem = await fetchThemeFromUrl(urlOrCss);
+          themeName = name || registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          themeId = `theme-${themeName}`;
+
+          newTheme = {
+            id: themeId,
+            name: themeName,
+            url: urlOrCss,
+          };
         }
-        return [...prev, newTheme];
-      });
 
-      return newTheme;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to add theme";
-      setError(errorMessage);
-      throw err;
-    }
-  }, []);
+        setThemes((prev) => {
+          // Check if theme already exists (by URL or CSS content)
+          if (prev.some((t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss))) {
+            return prev;
+          }
+          return [...prev, newTheme];
+        });
+
+        return newTheme;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to add theme";
+        setError(errorMessage);
+        throw err;
+      }
+    },
+    [],
+  );
 
   const removeTheme = useCallback(
     (themeId: string) => {

@@ -39,7 +39,7 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
       try {
         const registryItem = await fetchThemeFromUrl(url);
         setCurrentRegistryItem(registryItem);
-        applyThemeFromRegistry(registryItem, mode);
+        await applyThemeFromRegistry(registryItem, mode);
 
         // Find or create theme option
         const themeName = registryItem.name || extractThemeNameFromUrl(url);
@@ -102,7 +102,7 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   // Apply mode changes to current theme
   useEffect(() => {
     if (currentRegistryItem) {
-      applyThemeFromRegistry(currentRegistryItem, mode);
+      applyThemeFromRegistry(currentRegistryItem, mode).catch(console.error);
     }
   }, [mode, currentRegistryItem]);
 

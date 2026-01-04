@@ -2,7 +2,7 @@
  * TweakcnSwitcher - A component for switching shadcn/ui themes
  */
 
-import { Palette, Loader2, Plus, X, Moon, Sun } from "lucide-react";
+import { Palette, Loader2, Plus, X, Moon, Sun, Code, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,15 +10,15 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuLabel,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { useTweakcnSwitcher } from "@/lib/tweakcn-switcher/use-tweakcn-switcher";
+import { useTweakcnSwitcher } from "@/lib/tweakcn-switcher";
 import type { TweakcnSwitcherConfig } from "@/lib/tweakcn-switcher/types";
 import { cn } from "@/lib/utils";
+import { isCssCode } from "@/lib/tweakcn-switcher/utils";
 import { type KeyboardEvent, useState } from "react";
 
 export interface TweakcnSwitcherProps extends TweakcnSwitcherConfig {
@@ -39,34 +39,50 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
     setMode,
   } = useTweakcnSwitcher(config);
 
-  const [urlInput, setUrlInput] = useState("");
+  const [input, setInput] = useState("");
+  const [title, setTitle] = useState("");
   const [isAddingTheme, setIsAddingTheme] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showInput, setShowInput] = useState(false);
+  const [inputMode, setInputMode] = useState<"url" | "css">("url");
 
   const handleAddTheme = async () => {
-    if (!urlInput.trim()) return;
+    if (!input.trim()) return;
 
     setIsAddingTheme(true);
     try {
-      const newTheme = await addTheme(urlInput.trim());
+      const newTheme = await addTheme(input.trim(), title.trim() || undefined);
       if (newTheme !== null) {
         await applyThemeOption(newTheme);
+        setInput("");
+        setTitle("");
+        // Keep the form open so user can add another theme
       }
-      setUrlInput("");
-      setShowUrlInput(false);
     } catch (err) {
+      // Error is already set in the hook's error state, which will be displayed
       console.error("Failed to add theme:", err);
+      // Keep the input visible so user can fix the input
     } finally {
       setIsAddingTheme(false);
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    // Auto-detect input mode if user pastes CSS
+    if (isCssCode(e.target.value)) {
+      setInputMode("css");
+    } else if (e.target.value.trim().startsWith("http")) {
+      setInputMode("url");
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
       handleAddTheme();
     } else if (e.key === "Escape") {
-      setShowUrlInput(false);
-      setUrlInput("");
+      setShowInput(false);
+      setInput("");
     }
   };
 
@@ -87,7 +103,7 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
           </Button>
         }
       />
-      <DropdownMenuContent align={align} className="w-64">
+      <DropdownMenuContent align={align} className="w-96">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center justify-between">
             <span>Themes</span>
@@ -110,22 +126,72 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
 
           {error && <div className="px-2 py-1.5 text-xs text-destructive">{error}</div>}
 
-          {showUrlInput ? (
+          {showInput ? (
             <div className="px-2 py-1.5 space-y-2">
               <Input
-                placeholder="https://tweakcn.com/r/themes/..."
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                onKeyDown={handleKeyDown}
+                placeholder="Theme title (optional)"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 className="h-7 text-xs"
                 autoFocus
               />
+              <div className="flex gap-1 mb-1">
+                <Button
+                  variant={inputMode === "url" ? "default" : "ghost"}
+                  size="xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInputMode("url");
+                  }}
+                  className="h-6 flex-1 text-xs"
+                >
+                  <Link className="size-3 mr-1" />
+                  URL
+                </Button>
+                <Button
+                  variant={inputMode === "css" ? "default" : "ghost"}
+                  size="xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInputMode("css");
+                  }}
+                  className="h-6 flex-1 text-xs"
+                >
+                  <Code className="size-3 mr-1" />
+                  CSS
+                </Button>
+              </div>
+              {inputMode === "url" ? (
+                <Input
+                  placeholder="https://tweakcn.com/r/themes/..."
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  className="h-7 text-xs"
+                />
+              ) : (
+                <textarea
+                  placeholder="Paste CSS code here..."
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  className={cn(
+                    "dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50",
+                    "h-32 w-full rounded-none border bg-transparent px-2.5 py-1.5 text-xs",
+                    "transition-colors focus-visible:ring-1 outline-none",
+                    "resize-none font-mono",
+                  )}
+                />
+              )}
               <div className="flex gap-1">
                 <Button
                   variant="default"
                   size="xs"
-                  onClick={handleAddTheme}
-                  disabled={isAddingTheme || !urlInput.trim()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddTheme();
+                  }}
+                  disabled={isAddingTheme || !input.trim()}
                   className="flex-1 h-6"
                 >
                   {isAddingTheme ? (
@@ -138,9 +204,12 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
                 <Button
                   variant="ghost"
                   size="xs"
-                  onClick={() => {
-                    setShowUrlInput(false);
-                    setUrlInput("");
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowInput(false);
+                    setInput("");
+                    setTitle("");
+                    // Error will be cleared on next addTheme attempt
                   }}
                   className="h-6"
                 >
@@ -200,13 +269,23 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
           )}
         </DropdownMenuGroup>
 
-        {!showUrlInput && (
+        {!showInput && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowUrlInput(true)} className="cursor-pointer">
-              <Plus className="size-4 mr-2" />
-              Add theme from URL
-            </DropdownMenuItem>
+            <div className="px-2 py-1.5">
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowInput(true);
+                }}
+                className="w-full justify-start h-auto py-1.5 px-2 text-xs"
+              >
+                <Plus className="size-4 mr-2" />
+                Add theme
+              </Button>
+            </div>
           </>
         )}
       </DropdownMenuContent>
