@@ -1,0 +1,3 @@
+{
+  "extends": "@tweakcn-switcher/config/tsconfig.base.json"
+}
