@@ -24,9 +24,7 @@ function HomeComponent() {
       <Card className="w-full max-w-3xl">
         <CardHeader>
           <CardTitle>Tweakcn Switcher Demo</CardTitle>
-          <CardDescription>
-            A sophisticated, compact component for switching shadcn/ui themes
-          </CardDescription>
+          <CardDescription>A component for switching shadcn/ui themes</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>

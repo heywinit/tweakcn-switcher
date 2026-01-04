@@ -1,6 +1,6 @@
 # Tweakcn Switcher
 
-A sophisticated, compact component for switching ShadCN-ui themes dynamically.
+A component for switching shadcn/ui themes dynamically.
 
 ## Usage
 

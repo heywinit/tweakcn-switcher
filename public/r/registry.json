@@ -1,0 +1,33 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "tweakcn-switcher",
+  "homepage": "https://github.com/yourusername/tweakcn-switcher",
+  "items": [
+    {
+      "name": "tweakcn-switcher",
+      "type": "registry:component",
+      "title": "Tweakcn Switcher",
+      "description": "A component for switching shadcn/ui themes dynamically from tweakcn.com",
+      "registryDependencies": ["button", "input", "dropdown-menu"],
+      "files": [
+        {
+          "path": "registry/tweakcn-switcher/tweakcn-switcher.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/tweakcn-switcher/use-tweakcn-switcher.ts",
+          "type": "registry:hook"
+        },
+        {
+          "path": "registry/tweakcn-switcher/types.ts",
+          "type": "registry:lib"
+        },
+        {
+          "path": "registry/tweakcn-switcher/utils.ts",
+          "type": "registry:lib"
+        }
+      ]
+    }
+  ]
+}
+
