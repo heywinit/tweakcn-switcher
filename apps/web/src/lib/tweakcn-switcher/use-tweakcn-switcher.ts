@@ -2,7 +2,7 @@
  * Hook for managing shadcn/ui theme switching
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ThemeRegistryItem, ThemeOption, TweakcnSwitcherConfig } from "./types";
 import { applyThemeFromRegistry, fetchThemeFromUrl, extractThemeNameFromUrl } from "./utils";
 
@@ -30,16 +30,24 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"light" | "dark">("light");
   const [currentRegistryItem, setCurrentRegistryItem] = useState<ThemeRegistryItem | null>(null);
+  const isInitialMount = useRef(true);
+  const modeRef = useRef(mode);
+
+  // Keep modeRef in sync with mode state
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const applyTheme = useCallback(
-    async (url: string) => {
+    async (url: string, overrideMode?: "light" | "dark") => {
       setIsLoading(true);
       setError(null);
 
       try {
         const registryItem = await fetchThemeFromUrl(url);
         setCurrentRegistryItem(registryItem);
-        applyThemeFromRegistry(registryItem, mode);
+        const currentMode = overrideMode ?? modeRef.current;
+        applyThemeFromRegistry(registryItem, currentMode);
 
         // Find or create theme option
         const themeName = registryItem.name || extractThemeNameFromUrl(url);
@@ -63,7 +71,10 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
 
         // Persist if enabled
         if (persist) {
-          localStorage.setItem(storageKey, JSON.stringify({ url, mode, name: themeName }));
+          localStorage.setItem(
+            storageKey,
+            JSON.stringify({ url, mode: currentMode, name: themeName }),
+          );
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to apply theme";
@@ -73,12 +84,13 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
         setIsLoading(false);
       }
     },
-    [mode, persist, storageKey],
+    [persist, storageKey],
   );
 
-  // Load persisted theme on mount
+  // Load persisted theme on mount only
   useEffect(() => {
-    if (persist) {
+    if (persist && isInitialMount.current) {
+      isInitialMount.current = false;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         try {
@@ -87,24 +99,36 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
             setMode(savedTheme.mode);
           }
           if (savedTheme.url) {
-            // Apply theme after mode is set
-            setTimeout(() => {
-              applyTheme(savedTheme.url).catch(console.error);
-            }, 0);
+            // Apply theme with the saved mode
+            applyTheme(savedTheme.url, savedTheme.mode).catch(console.error);
           }
         } catch (e) {
           console.error("Failed to load saved theme:", e);
         }
+      } else {
+        isInitialMount.current = false;
       }
     }
-  }, [persist, storageKey, applyTheme]);
+  }, [persist, storageKey]);
 
   // Apply mode changes to current theme
   useEffect(() => {
     if (currentRegistryItem) {
       applyThemeFromRegistry(currentRegistryItem, mode);
+      // Update localStorage with new mode if persist is enabled
+      if (persist && currentTheme) {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const savedTheme = JSON.parse(saved);
+            localStorage.setItem(storageKey, JSON.stringify({ ...savedTheme, mode }));
+          } catch (e) {
+            console.error("Failed to update saved theme mode:", e);
+          }
+        }
+      }
     }
-  }, [mode, currentRegistryItem]);
+  }, [mode, currentRegistryItem, persist, storageKey, currentTheme]);
 
   const applyThemeOption = useCallback(
     async (theme: ThemeOption) => {
@@ -154,6 +178,10 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     [currentTheme, persist, storageKey],
   );
 
+  const handleSetMode = useCallback((newMode: "light" | "dark") => {
+    setMode(newMode);
+  }, []);
+
   return {
     currentTheme,
     themes,
@@ -164,6 +192,6 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     addTheme,
     removeTheme,
     mode,
-    setMode,
+    setMode: handleSetMode,
   };
 }
