@@ -9,12 +9,8 @@ function applyCSSVariable(
   value: string,
   root: HTMLElement = document.documentElement,
 ) {
-  const currentStyle = root.getAttribute("style") || "";
-
-  // Remove existing variable definitions with the same name
-  const cleanedStyle = currentStyle.replace(new RegExp(`--${key}:\\s*[^;]+;?`, "g"), "").trim();
-
-  root.setAttribute("style", `${cleanedStyle}${cleanedStyle ? " " : ""}--${key}: ${value};`);
+  // Use setProperty for CSS custom properties - more reliable than manipulating style attribute
+  root.style.setProperty(`--${key}`, value);
 }
 
 export function applyThemeFromRegistry(
