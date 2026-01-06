@@ -186,8 +186,16 @@ function HomeComponent() {
                 Programmable theme <span className="text-primary">switcher</span> for shadcn/ui
               </h1>
               <p className="text-base text-foreground/60 max-w-xl leading-relaxed">
-                Switch themes dynamically with a component or hook. Add themes from URLs or CSS.
-                Everything persists automatically.
+                A theme switcher component and hook for shadcn/ui. Load themes from{" "}
+                <a
+                  href="https://tweakcn.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:underline"
+                >
+                  tweakcn
+                </a>
+                {", "} any shadcn theme URLs, or pass CSS variables directly.
               </p>
             </div>
 
