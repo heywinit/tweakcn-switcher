@@ -103,7 +103,6 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
     <Button variant="outline" className={cn("relative", className)} aria-label="Switch theme">
       <Palette className="size-4 mr-2" />
       <span>Switch theme</span>
-      {currentTheme && <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />}
     </Button>
   );
 
