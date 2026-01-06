@@ -5,6 +5,7 @@
 import { Palette, Loader2, Plus, X, Moon, Sun, Code, Link, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogClose,
@@ -19,12 +20,14 @@ import type { TweakcnSwitcherConfig } from "@/lib/tweakcn-switcher/types";
 import { cn } from "@/lib/utils";
 import { isCssCode } from "@/lib/tweakcn-switcher/utils";
 import { type KeyboardEvent, useState } from "react";
+import { toast } from "sonner";
 
 export interface TweakcnSwitcherProps extends TweakcnSwitcherConfig {
   className?: string;
+  trigger?: React.ReactElement;
 }
 
-export function TweakcnSwitcher({ className, ...config }: TweakcnSwitcherProps) {
+export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitcherProps) {
   const {
     currentTheme,
     themes,
@@ -54,6 +57,9 @@ export function TweakcnSwitcher({ className, ...config }: TweakcnSwitcherProps) 
       const newTheme = await addTheme(input.trim(), title.trim() || undefined);
       if (newTheme !== null) {
         await applyThemeOption(newTheme);
+        toast.success("Theme added successfully!", {
+          description: `"${newTheme.name}" has been added and applied.`,
+        });
         setInput("");
         setTitle("");
         setShowInput(false);
@@ -93,24 +99,18 @@ export function TweakcnSwitcher({ className, ...config }: TweakcnSwitcherProps) 
     theme.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  const defaultTrigger = (
+    <Button variant="outline" className={cn("relative", className)} aria-label="Switch theme">
+      <Palette className="size-4 mr-2" />
+      <span>Switch theme</span>
+      {currentTheme && <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />}
+    </Button>
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button
-            variant="outline"
-            size="icon"
-            className={cn("relative", className)}
-            aria-label="Switch theme"
-          >
-            <Palette className="size-4" />
-            {currentTheme && (
-              <span className="absolute -top-1 -right-1 size-2 bg-primary rounded-full" />
-            )}
-          </Button>
-        }
-      />
-      <DialogContent className="sm:max-w-sm overflow-x-hidden" showCloseButton={false}>
+      <DialogTrigger render={trigger ?? defaultTrigger} />
+      <DialogContent className="sm:max-w-md overflow-x-hidden" showCloseButton={false}>
         <DialogHeader className="min-w-0">
           <DialogTitle className="flex items-center justify-between min-w-0 gap-2">
             <span className="truncate">Themes</span>
@@ -150,81 +150,120 @@ export function TweakcnSwitcher({ className, ...config }: TweakcnSwitcherProps) 
 
           {showInput ? (
             <div className="space-y-3 min-w-0">
-              <Input
-                placeholder="Theme title (optional)"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="h-8 text-sm w-full min-w-0"
-                autoFocus
-              />
-              <div className="flex gap-2 min-w-0">
-                <Button
-                  variant={inputMode === "url" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setInputMode("url")}
-                  className={cn("flex-1 min-w-0", inputMode === "url" && "border border-primary")}
-                >
-                  <Link className="size-3 mr-1.5 shrink-0" />
-                  <span className="truncate">URL</span>
-                </Button>
-                <Button
-                  variant={inputMode === "css" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setInputMode("css")}
-                  className={cn("flex-1 min-w-0", inputMode === "css" && "border border-primary")}
-                >
-                  <Code className="size-3 mr-1.5 shrink-0" />
-                  <span className="truncate">CSS</span>
-                </Button>
-              </div>
-              {inputMode === "url" ? (
+              <div className="space-y-2">
+                <Label htmlFor="theme-title" className="text-xs">
+                  Theme name <span className="text-muted-foreground/70">(optional)</span>
+                </Label>
                 <Input
-                  placeholder="https://tweakcn.com/r/themes/..."
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  className="h-8 text-sm w-full min-w-0"
+                  id="theme-title"
+                  placeholder="e.g., My Custom Theme"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-9 text-sm w-full min-w-0"
+                  autoFocus
                 />
-              ) : (
-                <textarea
-                  placeholder="Paste CSS code here..."
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  className={cn(
-                    "dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50",
-                    "h-32 w-full min-w-0 rounded-none border bg-transparent px-3 py-2 text-sm",
-                    "transition-colors focus-visible:ring-1 outline-none",
-                    "resize-none font-mono",
-                  )}
-                />
-              )}
-              <div className="flex gap-2 min-w-0">
-                <Button
-                  size="sm"
-                  onClick={handleAddTheme}
-                  disabled={isAddingTheme || !input.trim()}
-                  className="flex-1 min-w-0"
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs">Source type</Label>
+                <div className="flex gap-2 min-w-0">
+                  <Button
+                    variant={inputMode === "url" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setInputMode("url");
+                      setInput("");
+                    }}
+                    className={cn("flex-1 min-w-0", inputMode === "url" && "border border-primary")}
+                  >
+                    <Link className="size-3 mr-1.5 shrink-0" />
+                    <span className="truncate">URL</span>
+                  </Button>
+                  <Button
+                    variant={inputMode === "css" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setInputMode("css");
+                      setInput("");
+                    }}
+                    className={cn("flex-1 min-w-0", inputMode === "css" && "border border-primary")}
+                  >
+                    <Code className="size-3 mr-1.5 shrink-0" />
+                    <span className="truncate">CSS</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  htmlFor={inputMode === "url" ? "theme-url" : "theme-css"}
+                  className="text-xs"
                 >
-                  {isAddingTheme ? (
-                    <Loader2 className="size-3 animate-spin mr-1.5 shrink-0" />
-                  ) : (
-                    <Plus className="size-3 mr-1.5 shrink-0" />
-                  )}
-                  <span className="truncate">Add</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowInput(false);
-                    setInput("");
-                    setTitle("");
-                  }}
-                  className="shrink-0"
-                >
-                  Cancel
-                </Button>
+                  {inputMode === "url" ? "Theme URL" : "CSS Variables"}
+                </Label>
+                {inputMode === "url" ? (
+                  <div className="flex gap-2 min-w-0">
+                    <Input
+                      id="theme-url"
+                      placeholder="https://tweakcn.com/r/themes/..."
+                      value={input}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
+                      className="h-9 text-sm w-full min-w-0"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => window.open("https://tweakcn.com", "_blank")}
+                      title="Browse themes on tweakcn.com"
+                      aria-label="Browse themes on tweakcn.com"
+                      className="shrink-0 size-9 cursor-pointer"
+                    >
+                      <Link className="size-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <textarea
+                    id="theme-css"
+                    placeholder=":root {&#10;  --background: 0 0% 100%;&#10;  --foreground: 222.2 84% 4.9%;&#10;  ...&#10;}"
+                    value={input}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    className={cn(
+                      "dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50",
+                      "h-32 w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-sm",
+                      "transition-colors focus-visible:ring-1 outline-none",
+                      "resize-none font-mono",
+                    )}
+                  />
+                )}
+                <div className="flex gap-2 min-w-0 pt-1">
+                  <Button
+                    onClick={handleAddTheme}
+                    disabled={isAddingTheme || !input.trim()}
+                    className="flex-1 min-w-0"
+                  >
+                    {isAddingTheme ? (
+                      <Loader2 className="size-3 animate-spin mr-1.5 shrink-0" />
+                    ) : (
+                      <Plus className="size-3 mr-1.5 shrink-0" />
+                    )}
+                    <span className="truncate">Add theme</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowInput(false);
+                      setInput("");
+                      setTitle("");
+                      setInputMode("url");
+                    }}
+                    className="shrink-0"
+                    disabled={isAddingTheme}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
