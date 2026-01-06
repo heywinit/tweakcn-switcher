@@ -132,29 +132,23 @@ function HomeComponent() {
   const [copied, setCopied] = useState(false);
 
   // Get registry URL from current origin
-  const registryUrl = useMemo(() => {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/r/registry.json`;
-    }
-    return "/r/registry.json";
-  }, []);
+  const componentUrl = "https://tweakcn-switcher.vercel.app/r/tweakcn-switcher.json";
 
   // Generate command based on package manager
   const installCommand = useMemo(() => {
-    const componentName = "tweakcn-switcher";
     const baseCommand = "shadcn@latest add";
 
     switch (packageManager) {
       case "bun":
-        return `bunx ${baseCommand} ${componentName} --registry ${registryUrl}`;
+        return `bunx ${baseCommand} ${componentUrl}`;
       case "npm":
-        return `npx ${baseCommand} ${componentName} --registry ${registryUrl}`;
+        return `npx ${baseCommand} ${componentUrl}`;
       case "pnpm":
-        return `pnpm dlx ${baseCommand} ${componentName} --registry ${registryUrl}`;
+        return `pnpm dlx ${baseCommand} ${componentUrl}`;
       case "yarn":
-        return `yarn dlx ${baseCommand} ${componentName} --registry ${registryUrl}`;
+        return `yarn dlx ${baseCommand} ${componentUrl}`;
     }
-  }, [packageManager, registryUrl]);
+  }, [packageManager, componentUrl]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(installCommand);
@@ -282,6 +276,60 @@ function HomeComponent() {
               </button>
             </div>
             <CodeBlock code={activeTab === "component" ? componentCode : hookCode} />
+          </div>
+
+          {/* Props Documentation */}
+          <div className="flex flex-col gap-6">
+            <h2 className="text-2xl font-semibold">API Reference</h2>
+
+            <div>
+              <h3 className="text-xl font-semibold mb-3">TweakcnSwitcher Props</h3>
+              <CodeBlock
+                code={`interface TweakcnSwitcherProps extends TweakcnSwitcherConfig {
+  className?: string;              // Additional CSS classes for the trigger button
+  trigger?: React.ReactElement;    // Custom trigger element (default: button)
+}
+
+interface TweakcnSwitcherConfig {
+  defaultThemes?: ThemeOption[];   // Array of default themes to display
+  baseUrl?: string;                // Base URL for fetching themes
+  persist?: boolean;               // Persist to localStorage (default: true)
+  storageKey?: string;             // localStorage key (default: "tweakcn-switcher-theme")
+  allowDeleteDefaults?: boolean;   // Allow deleting default themes (default: true)
+}`}
+              />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold mb-3">useTweakcnSwitcher Returns</h3>
+              <CodeBlock
+                code={`interface UseTweakcnSwitcherReturn {
+  currentTheme: ThemeOption | null;                    // Currently active theme
+  themes: ThemeOption[];                               // All available themes
+  isLoading: boolean;                                  // Loading state
+  error: string | null;                                // Error message
+  applyTheme: (url: string) => Promise<void>;          // Apply theme from URL or CSS
+  applyThemeOption: (theme: ThemeOption) => Promise<void>; // Apply theme from ThemeOption
+  addTheme: (url: string, name?: string) => Promise<ThemeOption | null>; // Add new theme
+  removeTheme: (themeId: string) => void;              // Remove theme by ID
+  mode: "light" | "dark";                              // Current color mode
+  setMode: (mode: "light" | "dark") => void;           // Update color mode
+}`}
+              />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-semibold mb-3">Types</h3>
+              <CodeBlock
+                code={`interface ThemeOption {
+  id: string;          // Unique theme identifier
+  name: string;        // Theme display name
+  url?: string;        // URL to fetch theme from
+  css?: string;        // CSS variables as string
+  preview?: string;    // Optional preview image URL
+}`}
+              />
+            </div>
           </div>
         </div>
       </main>
