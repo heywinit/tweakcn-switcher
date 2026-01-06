@@ -157,11 +157,21 @@ export async function applyThemeFromRegistry(
     }
   }
 
-  // Apply mode-specific variables
+  // Apply mode-specific variables (excluding theme-level variables)
   const modeVars = cssVars[mode];
   if (modeVars) {
     Object.entries(modeVars).forEach(([key, value]) => {
-      applyCSSVariable(key, value, root);
+      // Skip theme-level variables (radius, font-*, shadow, tracking-*, spacing)
+      // These should only come from cssVars.theme
+      if (
+        !key.startsWith("font-") &&
+        !key.startsWith("radius") &&
+        !key.startsWith("shadow") &&
+        !key.startsWith("tracking-") &&
+        !key.startsWith("spacing")
+      ) {
+        applyCSSVariable(key, value, root);
+      }
     });
   }
 
@@ -382,11 +392,23 @@ export function parseCssToThemeRegistryItem(
       if (match[1] && match[2]) {
         const key = match[1].trim();
         const value = match[2].trim();
-        // These are typically color mappings, add to :root in @layer base
-        if (!cssLayerBase[":root"]) {
-          cssLayerBase[":root"] = {};
+        // Check if it's a theme-level variable (radius, font, shadow, etc.)
+        if (
+          key.startsWith("font-") ||
+          key.startsWith("radius") ||
+          key.startsWith("shadow") ||
+          key.startsWith("tracking-") ||
+          key.startsWith("spacing")
+        ) {
+          // Add to theme-level variables
+          cssVars.theme![key] = value;
+        } else {
+          // These are typically color mappings, add to :root in @layer base
+          if (!cssLayerBase[":root"]) {
+            cssLayerBase[":root"] = {};
+          }
+          cssLayerBase[":root"][`--${key}`] = value;
         }
-        cssLayerBase[":root"][`--${key}`] = value;
       }
     }
   }

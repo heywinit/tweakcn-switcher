@@ -31,4 +31,5 @@ export interface TweakcnSwitcherConfig {
   baseUrl?: string;
   persist?: boolean;
   storageKey?: string;
+  allowDeleteDefaults?: boolean;
 }

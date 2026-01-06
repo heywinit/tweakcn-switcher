@@ -2,19 +2,18 @@
  * TweakcnSwitcher - A component for switching shadcn/ui themes
  */
 
-import { Palette, Loader2, Plus, X, Moon, Sun, Code, Link } from "lucide-react";
+import { Palette, Loader2, Plus, X, Moon, Sun, Code, Link, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useTweakcnSwitcher } from "@/lib/tweakcn-switcher";
 import type { TweakcnSwitcherConfig } from "@/lib/tweakcn-switcher/types";
 import { cn } from "@/lib/utils";
@@ -23,27 +22,29 @@ import { type KeyboardEvent, useState } from "react";
 
 export interface TweakcnSwitcherProps extends TweakcnSwitcherConfig {
   className?: string;
-  align?: "start" | "center" | "end";
 }
 
-export function TweakcnSwitcher({ className, align = "end", ...config }: TweakcnSwitcherProps) {
+export function TweakcnSwitcher({ className, ...config }: TweakcnSwitcherProps) {
   const {
     currentTheme,
     themes,
-    isLoading,
     error,
     applyThemeOption,
     addTheme,
     removeTheme,
     mode,
     setMode,
+    isLoading,
   } = useTweakcnSwitcher(config);
+  const { allowDeleteDefaults = true, defaultThemes = [] } = config;
 
+  const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [title, setTitle] = useState("");
   const [isAddingTheme, setIsAddingTheme] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const [inputMode, setInputMode] = useState<"url" | "css">("url");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleAddTheme = async () => {
     if (!input.trim()) return;
@@ -55,7 +56,7 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
         await applyThemeOption(newTheme);
         setInput("");
         setTitle("");
-        // Keep the form open so user can add another theme
+        setShowInput(false);
       }
     } catch (err) {
       // Error is already set in the hook's error state, which will be displayed
@@ -83,12 +84,18 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
     } else if (e.key === "Escape") {
       setShowInput(false);
       setInput("");
+      setTitle("");
     }
   };
 
+  // Filter themes based on search query
+  const filteredThemes = themes.filter((theme) =>
+    theme.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
         render={
           <Button
             variant="outline"
@@ -103,62 +110,71 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
           </Button>
         }
       />
-      <DropdownMenuContent align={align} className="w-48">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex items-center justify-between py-1 pl-2 pr-1">
-            <span>Themes</span>
-            <div className="flex items-center gap-1">
+      <DialogContent className="sm:max-w-sm overflow-x-hidden" showCloseButton={false}>
+        <DialogHeader className="min-w-0">
+          <DialogTitle className="flex items-center justify-between min-w-0 gap-2">
+            <span className="truncate">Themes</span>
+            <div className="flex items-center gap-1 shrink-0">
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMode(mode === "light" ? "dark" : "light");
-                }}
-                className="h-6 w-6"
+                onClick={() => setMode(mode === "light" ? "dark" : "light")}
+                className="h-6 w-6 shrink-0"
                 aria-label={`Switch to ${mode === "light" ? "dark" : "light"} mode`}
               >
                 {mode === "light" ? <Moon className="size-3" /> : <Sun className="size-3" />}
               </Button>
+              <DialogClose
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="h-6 w-6 shrink-0"
+                    aria-label="Close dialog"
+                  >
+                    <X className="size-3" />
+                  </Button>
+                }
+              />
             </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
+          </DialogTitle>
+          <DialogDescription>Select a theme or add a new one</DialogDescription>
+        </DialogHeader>
 
-          {error && <div className="px-2 py-1.5 text-xs text-destructive">{error}</div>}
+        <div className="space-y-4 min-w-0 overflow-x-hidden">
+          {error && (
+            <div className="px-3 py-2 text-sm text-destructive bg-destructive/10 rounded-none border border-destructive/20">
+              {error}
+            </div>
+          )}
 
           {showInput ? (
-            <div className="px-2 py-1.5 space-y-1">
+            <div className="space-y-3 min-w-0">
               <Input
                 placeholder="Theme title (optional)"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="h-7 text-xs"
+                className="h-8 text-sm w-full min-w-0"
                 autoFocus
               />
-              <div className="flex gap-1 mb-1">
+              <div className="flex gap-2 min-w-0">
                 <Button
                   variant={inputMode === "url" ? "default" : "outline"}
-                  size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setInputMode("url");
-                  }}
-                  className={`h-6 flex-1 text-xs ${inputMode === "url" ? "border border-primary" : ""}`}
+                  size="sm"
+                  onClick={() => setInputMode("url")}
+                  className={cn("flex-1 min-w-0", inputMode === "url" && "border border-primary")}
                 >
-                  <Link className="size-3 mr-1" />
-                  URL
+                  <Link className="size-3 mr-1.5 shrink-0" />
+                  <span className="truncate">URL</span>
                 </Button>
                 <Button
                   variant={inputMode === "css" ? "default" : "outline"}
-                  size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setInputMode("css");
-                  }}
-                  className={`h-6 flex-1 text-xs ${inputMode === "css" ? "border border-primary" : ""}`}
+                  size="sm"
+                  onClick={() => setInputMode("css")}
+                  className={cn("flex-1 min-w-0", inputMode === "css" && "border border-primary")}
                 >
-                  <Code className="size-3 mr-1" />
-                  CSS
+                  <Code className="size-3 mr-1.5 shrink-0" />
+                  <span className="truncate">CSS</span>
                 </Button>
               </div>
               {inputMode === "url" ? (
@@ -167,7 +183,7 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
                   value={input}
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
-                  className="h-7 text-xs"
+                  className="h-8 text-sm w-full min-w-0"
                 />
               ) : (
                 <textarea
@@ -177,40 +193,35 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
                   onKeyDown={handleKeyDown}
                   className={cn(
                     "dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50",
-                    "h-32 w-full rounded-none border bg-transparent px-2.5 py-1.5 text-xs",
+                    "h-32 w-full min-w-0 rounded-none border bg-transparent px-3 py-2 text-sm",
                     "transition-colors focus-visible:ring-1 outline-none",
                     "resize-none font-mono",
                   )}
                 />
               )}
-              <div className="flex gap-1">
+              <div className="flex gap-2 min-w-0">
                 <Button
-                  size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddTheme();
-                  }}
+                  size="sm"
+                  onClick={handleAddTheme}
                   disabled={isAddingTheme || !input.trim()}
-                  className="flex-1 h-6 border border-primary"
+                  className="flex-1 min-w-0"
                 >
                   {isAddingTheme ? (
-                    <Loader2 className="size-3 animate-spin" />
+                    <Loader2 className="size-3 animate-spin mr-1.5 shrink-0" />
                   ) : (
-                    <Plus className="size-3" />
+                    <Plus className="size-3 mr-1.5 shrink-0" />
                   )}
-                  Add
+                  <span className="truncate">Add</span>
                 </Button>
                 <Button
                   variant="outline"
-                  size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  size="sm"
+                  onClick={() => {
                     setShowInput(false);
                     setInput("");
                     setTitle("");
-                    // Error will be cleared on next addTheme attempt
                   }}
-                  className="h-6"
+                  className="shrink-0"
                 >
                   Cancel
                 </Button>
@@ -218,69 +229,104 @@ export function TweakcnSwitcher({ className, align = "end", ...config }: Tweakcn
             </div>
           ) : (
             <>
-              {themes.length > 0 ? (
-                <DropdownMenuRadioGroup
-                  value={currentTheme?.id}
-                  onValueChange={(value) => {
-                    const theme = themes.find((t) => t.id === value);
-                    if (theme) {
-                      applyThemeOption(theme);
-                    }
-                  }}
-                >
-                  {themes.map((theme) => (
-                    <DropdownMenuRadioItem
+              <div className="relative min-w-0">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search themes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 text-sm pl-8 w-full min-w-0"
+                />
+              </div>
+              {filteredThemes.length > 0 ? (
+                <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden min-w-0">
+                  {filteredThemes.map((theme) => (
+                    <button
                       key={theme.id}
-                      value={theme.id}
-                      className="flex items-center justify-between group"
-                    >
-                      <span className="truncate flex-1">{theme.name}</span>
-                      {themes.length > (config.defaultThemes?.length || 0) && (
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeTheme(theme.id);
-                          }}
-                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label={`Remove ${theme.name}`}
-                        >
-                          <X className="size-3" />
-                        </Button>
+                      onClick={() => {
+                        // Prevent clicks if already loading or if this is the current theme
+                        if (isLoading || currentTheme?.id === theme.id) {
+                          return;
+                        }
+                        applyThemeOption(theme);
+                      }}
+                      type="button"
+                      className={cn(
+                        "flex items-center w-full text-start justify-between group px-3 py-2 rounded-md border border-transparent hover:bg-muted hover:border-border transition-colors min-w-0 cursor-pointer",
+                        currentTheme?.id === theme.id && "bg-muted border-border",
+                        (isLoading || currentTheme?.id === theme.id) &&
+                          "opacity-50 cursor-not-allowed",
                       )}
-                    </DropdownMenuRadioItem>
+                    >
+                      <span
+                        className={cn(
+                          "text-sm truncate flex-1 min-w-0",
+                          currentTheme?.id === theme.id ? "font-medium" : "text-muted-foreground",
+                        )}
+                      >
+                        {theme.name}
+                      </span>
+                      {(() => {
+                        // Check if this theme is a default theme
+                        const isDefaultTheme = defaultThemes.some((dt) => dt.id === theme.id);
+                        // Show delete button if allowDeleteDefaults is true (default) or if it's not a default theme
+                        const canDelete = allowDeleteDefaults || !isDefaultTheme;
+                        if (!canDelete) return null;
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const wasCurrentTheme = currentTheme?.id === theme.id;
+                              removeTheme(theme.id);
+
+                              // If we deleted the current theme, switch to another one
+                              if (wasCurrentTheme) {
+                                // Get the remaining themes after deletion
+                                const remainingThemes = themes.filter((t) => t.id !== theme.id);
+
+                                if (remainingThemes.length > 0) {
+                                  // Switch to the last theme
+                                  await applyThemeOption(
+                                    remainingThemes[remainingThemes.length - 1],
+                                  );
+                                } else if (defaultThemes.length > 0) {
+                                  // If no themes remain, switch to the first default theme
+                                  await applyThemeOption(defaultThemes[0]);
+                                }
+                                // If no themes and no defaults, do nothing (currentTheme is already null)
+                              }
+                            }}
+                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            aria-label={`Remove ${theme.name}`}
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        );
+                      })()}
+                    </button>
                   ))}
-                </DropdownMenuRadioGroup>
+                </div>
               ) : (
-                <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-                  No themes available
+                <div className="px-3 py-8 text-sm text-muted-foreground text-center">
+                  {searchQuery ? "No themes found" : "No themes available"}
                 </div>
               )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowInput(true)}
+                className="w-full min-w-0"
+              >
+                <Plus className="size-4 mr-2 shrink-0" />
+                <span className="truncate">Add theme</span>
+              </Button>
             </>
           )}
-        </DropdownMenuGroup>
-
-        {!showInput && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="">
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowInput(true);
-                }}
-                className="w-full justify-start h-auto py-1.5 px-2 text-xs"
-              >
-                <Plus className="size-4 mr-2" />
-                Add theme
-              </Button>
-            </div>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

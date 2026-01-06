@@ -39,6 +39,7 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   const [currentRegistryItem, setCurrentRegistryItem] = useState<ThemeRegistryItem | null>(null);
   const isInitialMount = useRef(true);
   const modeRef = useRef(mode);
+  const isApplyingRef = useRef(false);
 
   // Keep modeRef in sync with mode state
   useEffect(() => {
@@ -47,6 +48,11 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
 
   const applyTheme = useCallback(
     async (urlOrCss: string, overrideMode?: "light" | "dark") => {
+      // Prevent concurrent theme applications
+      if (isApplyingRef.current) {
+        return;
+      }
+      isApplyingRef.current = true;
       setIsLoading(true);
       setError(null);
 
@@ -115,6 +121,7 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
         console.error("Failed to apply theme:", err);
       } finally {
         setIsLoading(false);
+        isApplyingRef.current = false;
       }
     },
     [persist, storageKey],
@@ -196,13 +203,21 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
 
   const applyThemeOption = useCallback(
     async (theme: ThemeOption) => {
+      // Prevent applying the same theme if it's already the current theme
+      if (currentTheme?.id === theme.id) {
+        return;
+      }
+      // Prevent applying if already loading or applying
+      if (isLoading || isApplyingRef.current) {
+        return;
+      }
       if (theme.css) {
         await applyTheme(theme.css);
       } else if (theme.url) {
         await applyTheme(theme.url);
       }
     },
-    [applyTheme],
+    [applyTheme, currentTheme, isLoading],
   );
 
   const addTheme = useCallback(
