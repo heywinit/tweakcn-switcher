@@ -101,7 +101,7 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
 
   const defaultTrigger = (
     <Button variant="outline" className={cn("relative", className)} aria-label="Switch theme">
-      <Palette className="size-4 mr-2" />
+      <Palette className="size-4" />
       <span>Switch theme</span>
     </Button>
   );
