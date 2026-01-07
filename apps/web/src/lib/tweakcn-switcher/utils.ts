@@ -264,15 +264,48 @@ export function validateUrl(url: string): { valid: boolean; error?: string } {
   }
 }
 
+/**
+ * Normalizes tweakcn.com editor URLs to theme JSON URLs
+ * Transforms: https://tweakcn.com/editor/theme?theme=candyland
+ * To: https://tweakcn.com/r/themes/candyland.json
+ */
+export function normalizeTweakcnUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+
+    // Check if it's a tweakcn.com editor URL with a theme query parameter
+    if (
+      urlObj.hostname === "tweakcn.com" &&
+      urlObj.pathname === "/editor/theme" &&
+      urlObj.searchParams.has("theme")
+    ) {
+      const themeName = urlObj.searchParams.get("theme");
+      if (themeName) {
+        // Transform to the theme JSON URL format
+        return `https://tweakcn.com/r/themes/${themeName}.json`;
+      }
+    }
+
+    // Return the original URL if it doesn't match the pattern
+    return url;
+  } catch {
+    // If URL parsing fails, return the original URL
+    return url;
+  }
+}
+
 export async function fetchThemeFromUrl(url: string): Promise<ThemeRegistryItem> {
+  // Normalize the URL first (transform editor URLs to theme JSON URLs)
+  const normalizedUrl = normalizeTweakcnUrl(url);
+
   // Validate URL first
-  const validation = validateUrl(url);
+  const validation = validateUrl(normalizedUrl);
   if (!validation.valid) {
     throw new Error(validation.error || "Invalid URL");
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(normalizedUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch theme: ${response.statusText} (${response.status})`);
     }

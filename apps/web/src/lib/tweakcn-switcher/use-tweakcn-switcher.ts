@@ -11,6 +11,7 @@ import {
   validateUrl,
   parseCssToThemeRegistryItem,
   isCssCode,
+  normalizeTweakcnUrl,
 } from "./utils";
 
 export interface UseTweakcnSwitcherReturn {
@@ -92,15 +93,16 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
             css: urlOrCss,
           };
         } else {
-          // Handle URL
-          registryItem = await fetchThemeFromUrl(urlOrCss);
-          themeName = registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          // Handle URL - normalize editor URLs to JSON URLs
+          const normalizedUrl = normalizeTweakcnUrl(urlOrCss);
+          registryItem = await fetchThemeFromUrl(normalizedUrl);
+          themeName = registryItem.name || extractThemeNameFromUrl(normalizedUrl);
           themeId = `theme-${themeName}`;
 
           themeOption = {
             id: themeId,
             name: themeName,
-            url: urlOrCss,
+            url: normalizedUrl,
           };
         }
 
@@ -110,8 +112,12 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
 
         setThemes((prev) => {
           // Check if theme already exists (by URL or CSS content)
+          // Normalize URLs for comparison
+          const normalizedInputUrl = isCssCode(urlOrCss) ? urlOrCss : normalizeTweakcnUrl(urlOrCss);
           const existing = prev.find(
-            (t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss),
+            (t) =>
+              (t.url && normalizeTweakcnUrl(t.url) === normalizedInputUrl) ||
+              (t.css && t.css === urlOrCss),
           );
           if (!existing) {
             const updated = [...prev, themeOption];
@@ -127,7 +133,7 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
           localStorage.setItem(
             storageKey,
             JSON.stringify({
-              ...(isCssCode(urlOrCss) ? { css: urlOrCss } : { url: urlOrCss }),
+              ...(isCssCode(urlOrCss) ? { css: urlOrCss } : { url: themeOption.url }),
               mode: currentMode,
               name: themeName,
             }),
@@ -259,21 +265,30 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
             css: urlOrCss,
           };
         } else {
-          // Handle URL
-          registryItem = await fetchThemeFromUrl(urlOrCss);
-          themeName = name || registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          // Handle URL - normalize editor URLs to JSON URLs
+          const normalizedUrl = normalizeTweakcnUrl(urlOrCss);
+          registryItem = await fetchThemeFromUrl(normalizedUrl);
+          themeName = name || registryItem.name || extractThemeNameFromUrl(normalizedUrl);
           themeId = `theme-${themeName}`;
 
           newTheme = {
             id: themeId,
             name: themeName,
-            url: urlOrCss,
+            url: normalizedUrl,
           };
         }
 
         setThemes((prev) => {
           // Check if theme already exists (by URL or CSS content)
-          if (prev.some((t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss))) {
+          // Normalize URLs for comparison
+          const normalizedInputUrl = isCssCode(urlOrCss) ? urlOrCss : normalizeTweakcnUrl(urlOrCss);
+          if (
+            prev.some(
+              (t) =>
+                (t.url && normalizeTweakcnUrl(t.url) === normalizedInputUrl) ||
+                (t.css && t.css === urlOrCss),
+            )
+          ) {
             return prev;
           }
           return [...prev, newTheme];
