@@ -53,7 +53,6 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
     mode,
     setMode,
     isLoading,
-    favorites,
     toggleFavorite,
     isFavorite,
   } = useTweakcnSwitcher(config);
@@ -67,7 +66,10 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
   const [inputMode, setInputMode] = useState<"url" | "css">("url");
   const [searchQuery, setSearchQuery] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewTheme, setPreviewTheme] = useState<{ theme: any; registryItem: ThemeRegistryItem | null } | null>(null);
+  const [previewTheme, setPreviewTheme] = useState<{
+    theme: any;
+    registryItem: ThemeRegistryItem | null;
+  } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
   const handleAddTheme = async () => {
@@ -133,7 +135,7 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
     });
   }, [themes, searchQuery, isFavorite]);
 
-  const handlePreviewTheme = async (theme: typeof themes[0]) => {
+  const handlePreviewTheme = async (theme: (typeof themes)[0]) => {
     setLoadingPreview(true);
     setPreviewOpen(true);
     setPreviewTheme({ theme, registryItem: null });
@@ -367,7 +369,11 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
                             "h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
                             isFavorite(theme.id) && "opacity-100",
                           )}
-                          aria-label={isFavorite(theme.id) ? `Unfavorite ${theme.name}` : `Favorite ${theme.name}`}
+                          aria-label={
+                            isFavorite(theme.id)
+                              ? `Unfavorite ${theme.name}`
+                              : `Favorite ${theme.name}`
+                          }
                         >
                           <Star
                             className={cn(
@@ -381,9 +387,7 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
                         <span
                           className={cn(
                             "text-sm truncate flex-1 min-w-0",
-                            currentTheme?.id === theme.id
-                              ? "font-medium"
-                              : "text-muted-foreground",
+                            currentTheme?.id === theme.id ? "font-medium" : "text-muted-foreground",
                           )}
                         >
                           {theme.name}
