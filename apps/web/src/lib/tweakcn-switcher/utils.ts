@@ -444,3 +444,63 @@ export function isCssCode(input: string): boolean {
     (trimmed.includes("{") && trimmed.includes("}") && trimmed.includes(":"))
   );
 }
+
+export interface ColorSwatch {
+  name: string;
+  value: string;
+}
+
+/**
+ * Extract color swatches from a theme registry item
+ * Returns an array of color swatches with variable names and values
+ */
+export function extractColorSwatches(
+  registryItem: ThemeRegistryItem,
+  mode: "light" | "dark" = "light",
+): ColorSwatch[] {
+  const colors: ColorSwatch[] = [];
+  const modeVars = registryItem.cssVars[mode] || {};
+  const usedValues = new Set<string>();
+
+  // Priority order for color extraction
+  const colorKeys = [
+    "background",
+    "foreground",
+    "primary",
+    "secondary",
+    "accent",
+    "muted",
+    "destructive",
+    "border",
+    "ring",
+    "card",
+    "popover",
+  ];
+
+  for (const key of colorKeys) {
+    if (modeVars[key] && !usedValues.has(modeVars[key])) {
+      colors.push({ name: key, value: modeVars[key] });
+      usedValues.add(modeVars[key]);
+    }
+  }
+
+  // If we don't have enough colors, add any remaining color variables
+  if (colors.length < 8) {
+    for (const [key, value] of Object.entries(modeVars)) {
+      if (
+        !usedValues.has(value) &&
+        !key.startsWith("font-") &&
+        !key.startsWith("radius") &&
+        !key.startsWith("shadow") &&
+        !key.startsWith("tracking-") &&
+        !key.startsWith("spacing")
+      ) {
+        colors.push({ name: key, value });
+        usedValues.add(value);
+        if (colors.length >= 8) break;
+      }
+    }
+  }
+
+  return colors.slice(0, 8); // Return up to 8 colors
+}

@@ -7,11 +7,15 @@
       "name": "tweakcn-switcher",
       "type": "registry:component",
       "title": "Tweakcn Switcher",
-      "description": "A component for switching shadcn/ui themes dynamically from tweakcn.com",
-      "registryDependencies": ["button", "input", "dropdown-menu"],
+      "description": "A component for switching shadcn/ui themes dynamically from tweakcn.com with favorites and preview support",
+      "registryDependencies": ["button", "input", "dialog", "label"],
       "files": [
         {
           "path": "registry/tweakcn-switcher/tweakcn-switcher.tsx",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/tweakcn-switcher/theme-preview-dialog.tsx",
           "type": "registry:component"
         },
         {

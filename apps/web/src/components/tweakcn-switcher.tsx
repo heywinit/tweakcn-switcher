@@ -2,7 +2,20 @@
  * TweakcnSwitcher - A component for switching shadcn/ui themes
  */
 
-import { Palette, Loader2, Plus, X, Moon, Sun, Code, Link, Search, Trash2 } from "lucide-react";
+import {
+  Palette,
+  Loader2,
+  Plus,
+  X,
+  Moon,
+  Sun,
+  Code,
+  Link,
+  Search,
+  Trash2,
+  Star,
+  Eye,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,9 +31,11 @@ import {
 import { useTweakcnSwitcher } from "@/lib/tweakcn-switcher";
 import type { TweakcnSwitcherConfig } from "@/lib/tweakcn-switcher/types";
 import { cn } from "@/lib/utils";
-import { isCssCode } from "@/lib/tweakcn-switcher/utils";
-import { type KeyboardEvent, useState } from "react";
+import { isCssCode, fetchThemeFromUrl, parseCssToThemeRegistryItem } from "@/lib/tweakcn-switcher/utils";
+import { type KeyboardEvent, useState, useMemo } from "react";
 import { toast } from "sonner";
+import { ThemePreviewDialog } from "./theme-preview-dialog";
+import type { ThemeRegistryItem } from "@/lib/tweakcn-switcher/types";
 
 export interface TweakcnSwitcherProps extends TweakcnSwitcherConfig {
   className?: string;
@@ -38,6 +53,9 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
     mode,
     setMode,
     isLoading,
+    favorites,
+    toggleFavorite,
+    isFavorite,
   } = useTweakcnSwitcher(config);
   const { allowDeleteDefaults = true, defaultThemes = [] } = config;
 
@@ -48,6 +66,9 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
   const [showInput, setShowInput] = useState(false);
   const [inputMode, setInputMode] = useState<"url" | "css">("url");
   const [searchQuery, setSearchQuery] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTheme, setPreviewTheme] = useState<{ theme: any; registryItem: ThemeRegistryItem | null } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const handleAddTheme = async () => {
     if (!input.trim()) return;
@@ -94,10 +115,48 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
     }
   };
 
-  // Filter themes based on search query
-  const filteredThemes = themes.filter((theme) =>
-    theme.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Filter and sort themes: favorites first, then by search query
+  const filteredAndSortedThemes = useMemo(() => {
+    const filtered = themes.filter((theme) =>
+      theme.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+
+    // Sort: favorites first, then alphabetically
+    return filtered.sort((a, b) => {
+      const aIsFavorite = isFavorite(a.id);
+      const bIsFavorite = isFavorite(b.id);
+
+      if (aIsFavorite && !bIsFavorite) return -1;
+      if (!aIsFavorite && bIsFavorite) return 1;
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [themes, searchQuery, isFavorite]);
+
+  const handlePreviewTheme = async (theme: typeof themes[0]) => {
+    setLoadingPreview(true);
+    setPreviewOpen(true);
+    setPreviewTheme({ theme, registryItem: null });
+
+    try {
+      let registryItem: ThemeRegistryItem;
+      if (theme.css) {
+        registryItem = parseCssToThemeRegistryItem(theme.css, theme.name);
+      } else if (theme.url) {
+        registryItem = await fetchThemeFromUrl(theme.url);
+      } else {
+        setLoadingPreview(false);
+        return;
+      }
+
+      setPreviewTheme({ theme, registryItem });
+    } catch (err) {
+      console.error("Failed to load theme for preview:", err);
+      toast.error("Failed to load theme preview");
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
 
   const defaultTrigger = (
     <Button variant="outline" className={cn("relative", className)} aria-label="Switch theme">
@@ -276,9 +335,9 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
                   className="h-8 text-sm pl-8 w-full min-w-0"
                 />
               </div>
-              {filteredThemes.length > 0 ? (
+              {filteredAndSortedThemes.length > 0 ? (
                 <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden min-w-0">
-                  {filteredThemes.map((theme) => (
+                  {filteredAndSortedThemes.map((theme) => (
                     <button
                       key={theme.id}
                       onClick={() => {
@@ -296,53 +355,94 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
                           "opacity-50 cursor-not-allowed",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "text-sm truncate flex-1 min-w-0",
-                          currentTheme?.id === theme.id ? "font-medium" : "text-muted-foreground",
-                        )}
-                      >
-                        {theme.name}
-                      </span>
-                      {(() => {
-                        // Check if this theme is a default theme
-                        const isDefaultTheme = defaultThemes.some((dt) => dt.id === theme.id);
-                        // Show delete button if allowDeleteDefaults is true (default) or if it's not a default theme
-                        const canDelete = allowDeleteDefaults || !isDefaultTheme;
-                        if (!canDelete) return null;
-                        return (
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const wasCurrentTheme = currentTheme?.id === theme.id;
-                              removeTheme(theme.id);
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(theme.id);
+                          }}
+                          className={cn(
+                            "h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                            isFavorite(theme.id) && "opacity-100",
+                          )}
+                          aria-label={isFavorite(theme.id) ? `Unfavorite ${theme.name}` : `Favorite ${theme.name}`}
+                        >
+                          <Star
+                            className={cn(
+                              "size-3",
+                              isFavorite(theme.id)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "text-muted-foreground",
+                            )}
+                          />
+                        </Button>
+                        <span
+                          className={cn(
+                            "text-sm truncate flex-1 min-w-0",
+                            currentTheme?.id === theme.id
+                              ? "font-medium"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {theme.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await handlePreviewTheme(theme);
+                          }}
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label={`Preview ${theme.name}`}
+                          title="Preview theme"
+                        >
+                          <Eye className="size-3" />
+                        </Button>
+                        {(() => {
+                          // Check if this theme is a default theme
+                          const isDefaultTheme = defaultThemes.some((dt) => dt.id === theme.id);
+                          // Show delete button if allowDeleteDefaults is true (default) or if it's not a default theme
+                          const canDelete = allowDeleteDefaults || !isDefaultTheme;
+                          if (!canDelete) return null;
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const wasCurrentTheme = currentTheme?.id === theme.id;
+                                removeTheme(theme.id);
 
-                              // If we deleted the current theme, switch to another one
-                              if (wasCurrentTheme) {
-                                // Get the remaining themes after deletion
-                                const remainingThemes = themes.filter((t) => t.id !== theme.id);
+                                // If we deleted the current theme, switch to another one
+                                if (wasCurrentTheme) {
+                                  // Get the remaining themes after deletion
+                                  const remainingThemes = themes.filter((t) => t.id !== theme.id);
 
-                                if (remainingThemes.length > 0) {
-                                  // Switch to the last theme
-                                  await applyThemeOption(
-                                    remainingThemes[remainingThemes.length - 1],
-                                  );
-                                } else if (defaultThemes.length > 0) {
-                                  // If no themes remain, switch to the first default theme
-                                  await applyThemeOption(defaultThemes[0]);
+                                  if (remainingThemes.length > 0) {
+                                    // Switch to the last theme
+                                    await applyThemeOption(
+                                      remainingThemes[remainingThemes.length - 1],
+                                    );
+                                  } else if (defaultThemes.length > 0) {
+                                    // If no themes remain, switch to the first default theme
+                                    await applyThemeOption(defaultThemes[0]);
+                                  }
+                                  // If no themes and no defaults, do nothing (currentTheme is already null)
                                 }
-                                // If no themes and no defaults, do nothing (currentTheme is already null)
-                              }
-                            }}
-                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                            aria-label={`Remove ${theme.name}`}
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
-                        );
-                      })()}
+                              }}
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label={`Remove ${theme.name}`}
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          );
+                        })()}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -365,6 +465,16 @@ export function TweakcnSwitcher({ className, trigger, ...config }: TweakcnSwitch
           )}
         </div>
       </DialogContent>
+
+      {/* Theme Preview Dialog */}
+      <ThemePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        theme={previewTheme?.theme || null}
+        registryItem={previewTheme?.registryItem || null}
+        mode={mode}
+        isLoading={loadingPreview}
+      />
     </Dialog>
   );
 }

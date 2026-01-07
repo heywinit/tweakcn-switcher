@@ -40,38 +40,178 @@ const defaultThemes = [
 const componentCode = `import { TweakcnSwitcher } from "@/components/tweakcn-switcher";
 
 function App() {
+  // Define your default themes that will appear in the switcher
+  const defaultThemes = [
+    {
+      id: "caffeine",
+      name: "Caffeine",
+      url: "https://tweakcn.com/r/themes/caffeine.json",
+    },
+    {
+      id: "darkmatter",
+      name: "Darkmatter",
+      url: "https://tweakcn.com/r/themes/darkmatter.json",
+    },
+    {
+      id: "tangerine",
+      name: "Tangerine",
+      url: "https://tweakcn.com/r/themes/tangerine.json",
+    },
+  ];
+
   return (
-    <TweakcnSwitcher
-      defaultThemes={[
-        {
-          id: "caffeine",
-          name: "Caffeine",
-          url: "https://tweakcn.com/r/themes/caffeine.json",
-        },
-      ]}
-    />
+    <div>
+      {/* Simple usage - just pass default themes */}
+      <TweakcnSwitcher defaultThemes={defaultThemes} />
+
+      {/* With custom styling */}
+      <TweakcnSwitcher
+        defaultThemes={defaultThemes}
+        className="my-custom-class"
+      />
+
+      {/* With custom trigger button */}
+      <TweakcnSwitcher
+        defaultThemes={defaultThemes}
+        trigger={
+          <button className="px-4 py-2 bg-primary text-primary-foreground rounded">
+            Change Theme
+          </button>
+        }
+      />
+
+      {/* With persistence disabled */}
+      <TweakcnSwitcher
+        defaultThemes={defaultThemes}
+        persist={false}
+      />
+    </div>
   );
 }`;
 
 const hookCode = `import { useTweakcnSwitcher } from "@/lib/tweakcn-switcher";
+import { useState } from "react";
 
 function CustomSwitcher() {
-  const { currentTheme, themes, applyTheme, mode, setMode } =
-    useTweakcnSwitcher({
-      defaultThemes: [
-        {
-          id: "caffeine",
-          name: "Caffeine",
-          url: "https://tweakcn.com/r/themes/caffeine.json",
-        },
-      ],
-    });
+  // Initialize the hook with default themes
+  const {
+    currentTheme,      // Currently active theme (or null)
+    themes,            // All available themes (defaults + added)
+    isLoading,         // Loading state when fetching themes
+    error,             // Error message if something goes wrong
+    applyTheme,        // Function to apply theme from URL or CSS string
+    applyThemeOption,  // Function to apply theme from ThemeOption object
+    addTheme,          // Function to add a new theme dynamically
+    removeTheme,       // Function to remove a theme by ID
+    mode,              // Current color mode: "light" | "dark"
+    setMode,           // Function to change color mode
+  } = useTweakcnSwitcher({
+    defaultThemes: [
+      {
+        id: "caffeine",
+        name: "Caffeine",
+        url: "https://tweakcn.com/r/themes/caffeine.json",
+      },
+      {
+        id: "darkmatter",
+        name: "Darkmatter",
+        url: "https://tweakcn.com/r/themes/darkmatter.json",
+      },
+    ],
+    persist: true,              // Save to localStorage (default: true)
+    storageKey: "my-theme",     // Custom storage key (default: "tweakcn-switcher-theme")
+    allowDeleteDefaults: true,  // Allow deleting default themes (default: true)
+  });
+
+  const [customUrl, setCustomUrl] = useState("");
+
+  // Apply a theme from a URL
+  const handleApplyFromUrl = async () => {
+    try {
+      await applyTheme("https://tweakcn.com/r/themes/tangerine.json");
+      console.log("Theme applied successfully!");
+    } catch (err) {
+      console.error("Failed to apply theme:", err);
+    }
+  };
+
+  // Apply a theme from CSS variables directly
+  const handleApplyFromCSS = async () => {
+    const cssVariables = \`
+      --background: 0 0% 100%;
+      --foreground: 222.2 84% 4.9%;
+      --primary: 221.2 83.2% 53.3%;
+      --primary-foreground: 210 40% 98%;
+    \`;
+    await applyTheme(cssVariables);
+  };
+
+  // Add a new theme dynamically
+  const handleAddTheme = async () => {
+    if (!customUrl) return;
+    const newTheme = await addTheme(customUrl, "Custom Theme");
+    if (newTheme) {
+      console.log("Theme added:", newTheme);
+      setCustomUrl("");
+    }
+  };
 
   return (
-    <div>
-      <button onClick={() => applyTheme("https://tweakcn.com/r/themes/...")}>
-        Apply Theme
+    <div className="space-y-4">
+      {/* Display current theme */}
+      <div>
+        <p>Current theme: {currentTheme?.name || "None"}</p>
+        <p>Mode: {mode}</p>
+        {isLoading && <p>Loading theme...</p>}
+        {error && <p className="text-red-500">Error: {error}</p>}
+      </div>
+
+      {/* Theme list */}
+      <div>
+        <h3>Available Themes:</h3>
+        <ul>
+          {themes.map((theme) => (
+            <li key={theme.id} className="flex items-center gap-2">
+              <button onClick={() => applyThemeOption(theme)}>
+                Apply {theme.name}
+              </button>
+              {theme.id !== "caffeine" && theme.id !== "darkmatter" && (
+                <button onClick={() => removeTheme(theme.id)}>
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Apply theme from URL */}
+      <button onClick={handleApplyFromUrl}>
+        Apply Tangerine Theme
       </button>
+
+      {/* Apply theme from CSS */}
+      <button onClick={handleApplyFromCSS}>
+        Apply Custom CSS Theme
+      </button>
+
+      {/* Add new theme */}
+      <div>
+        <input
+          type="text"
+          value={customUrl}
+          onChange={(e) => setCustomUrl(e.target.value)}
+          placeholder="Theme URL or CSS variables"
+        />
+        <button onClick={handleAddTheme}>Add Theme</button>
+      </div>
+
+      {/* Toggle color mode */}
+      <div>
+        <button onClick={() => setMode(mode === "light" ? "dark" : "light")}>
+          Toggle to {mode === "light" ? "Dark" : "Light"} Mode
+        </button>
+      </div>
     </div>
   );
 }`;

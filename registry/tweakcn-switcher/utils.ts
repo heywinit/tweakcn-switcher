@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 /**
  * Utility functions for applying theme CSS variables
  */
@@ -8,10 +7,9 @@ import type { ThemeRegistryItem, ThemeRegistryCssVars } from "./types";
 function applyCSSVariable(
   key: string,
   value: string,
-  root: HTMLElement | null = typeof document !== "undefined" ? document.documentElement : null,
+  root: HTMLElement = document.documentElement,
 ) {
-  if (!root) return;
-  // Use setProperty for CSS custom properties - more reliable than manipulating style attribute
+  // Use setProperty for CSS custom properties
   root.style.setProperty(`--${key}`, value);
 }
 
@@ -19,9 +17,8 @@ function applyCSSVariable(
  * Remove all font links added by tweakcn-switcher
  */
 function removeFontLinks() {
-  if (typeof document === "undefined") return;
   const existing = document.querySelectorAll('link[data-tweakcn-switcher-font="true"]');
-  existing.forEach((el: Element) => el.remove());
+  existing.forEach((el) => el.remove());
 }
 
 /**
@@ -58,10 +55,6 @@ function getGoogleFontsUrl(fontName: string): string | null {
  * Load a font from Google Fonts URL
  */
 function loadGoogleFont(url: string): Promise<void> {
-  if (typeof document === "undefined") {
-    return Promise.resolve();
-  }
-
   return new Promise<void>((resolve) => {
     // Check if link already exists
     const existing = document.querySelector(`link[href="${url}"]`);
@@ -90,10 +83,6 @@ function loadGoogleFont(url: string): Promise<void> {
  * This is best-effort - if it fails, the dev can handle it
  */
 async function tryLoadFontsFromGoogleFonts(fontFamily: string): Promise<void> {
-  if (typeof document === "undefined") {
-    return;
-  }
-
   const fontNames = extractFontNames(fontFamily);
 
   if (fontNames.length === 0) {
@@ -116,10 +105,6 @@ export async function applyThemeFromRegistry(
   registryItem: ThemeRegistryItem,
   mode: "light" | "dark" = "light",
 ) {
-  if (typeof document === "undefined") {
-    return;
-  }
-
   const root = document.documentElement;
   const { cssVars, css } = registryItem;
 
@@ -194,7 +179,7 @@ export async function applyThemeFromRegistry(
   if (css?.["@layer base"]) {
     // Remove existing style elements
     const existing = document.querySelectorAll('style[data-tweakcn-switcher="true"]');
-    existing.forEach((el: Element) => el.remove());
+    existing.forEach((el) => el.remove());
 
     const baseStyles = css["@layer base"];
     const styleElement = document.createElement("style");
@@ -221,18 +206,114 @@ export async function applyThemeFromRegistry(
   }
 }
 
-export async function fetchThemeFromUrl(url: string): Promise<ThemeRegistryItem> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch theme: ${response.statusText}`);
+/**
+ * Validates if a string is a valid URL
+ * Handles malformed URIs gracefully
+ */
+export function validateUrl(url: string): { valid: boolean; error?: string } {
+  if (!url || typeof url !== "string" || url.trim().length === 0) {
+    return { valid: false, error: "URL cannot be empty" };
   }
-  const data = await response.json();
-  return data as ThemeRegistryItem;
+
+  const trimmedUrl = url.trim();
+
+  // Try to create a URL object to validate
+  try {
+    // Attempt to decode URI components first to catch malformed sequences
+    try {
+      decodeURIComponent(trimmedUrl);
+    } catch (_e) {
+      return {
+        valid: false,
+        error: "Invalid URL: contains malformed characters. Please check the URL and try again.",
+      };
+    }
+
+    // Validate URL structure
+    const urlObj = new URL(trimmedUrl);
+
+    // Ensure it's http or https
+    if (!["http:", "https:"].includes(urlObj.protocol)) {
+      return {
+        valid: false,
+        error: "URL must use http or https protocol",
+      };
+    }
+
+    return { valid: true };
+  } catch (e) {
+    // If URL constructor throws, it's invalid
+    if (e instanceof TypeError) {
+      return {
+        valid: false,
+        error:
+          "Invalid URL format. Please enter a valid URL (e.g., https://example.com/theme.json)",
+      };
+    }
+    // Handle URI malformed errors
+    if (e instanceof URIError) {
+      return {
+        valid: false,
+        error: "Invalid URL: contains malformed characters. Please check the URL and try again.",
+      };
+    }
+    return {
+      valid: false,
+      error: "Invalid URL format",
+    };
+  }
+}
+
+export async function fetchThemeFromUrl(url: string): Promise<ThemeRegistryItem> {
+  // Validate URL first
+  const validation = validateUrl(url);
+  if (!validation.valid) {
+    throw new Error(validation.error || "Invalid URL");
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch theme: ${response.statusText} (${response.status})`);
+    }
+    return response.json();
+  } catch (e) {
+    // Handle network errors and malformed URI errors
+    if (e instanceof TypeError && e.message.includes("Failed to fetch")) {
+      throw new Error(
+        "Network error: Unable to fetch theme. Please check your connection and the URL.",
+      );
+    }
+    if (e instanceof URIError) {
+      throw new Error(
+        "Invalid URL: contains malformed characters. Please check the URL and try again.",
+      );
+    }
+    // Re-throw if it's already an Error with a message
+    if (e instanceof Error) {
+      throw e;
+    }
+    throw new Error("Failed to fetch theme: Unknown error occurred");
+  }
 }
 
 export function extractThemeNameFromUrl(url: string): string {
-  const match = url.match(/\/([^/]+)\.json$/);
-  return match && match[1] ? match[1] : "custom-theme";
+  try {
+    const match = url.match(/\/([^/]+)\.json$/);
+    if (match && match[1]) {
+      // Try to decode the theme name if it's URL encoded
+      try {
+        return decodeURIComponent(match[1]);
+      } catch {
+        // If decoding fails, return the raw match
+        return match[1];
+      }
+    }
+    return "custom-theme";
+  } catch {
+    // If anything goes wrong, return a safe default
+    return "custom-theme";
+  }
 }
 
 /**
@@ -350,17 +431,76 @@ export function parseCssToThemeRegistryItem(
 export function isCssCode(input: string): boolean {
   const trimmed = input.trim();
   // If it's a valid URL, it's not CSS
-  try {
-    new URL(trimmed);
+  const urlValidation = validateUrl(trimmed);
+  if (urlValidation.valid) {
     return false;
-  } catch {
-    // Not a valid URL, check for CSS indicators
-    return (
-      trimmed.includes(":root") ||
-      trimmed.includes(".dark") ||
-      trimmed.includes("@theme") ||
-      trimmed.includes("--") ||
-      (trimmed.includes("{") && trimmed.includes("}") && trimmed.includes(":"))
-    );
   }
+  // Check for CSS indicators
+  return (
+    trimmed.includes(":root") ||
+    trimmed.includes(".dark") ||
+    trimmed.includes("@theme") ||
+    trimmed.includes("--") ||
+    (trimmed.includes("{") && trimmed.includes("}") && trimmed.includes(":"))
+  );
+}
+
+export interface ColorSwatch {
+  name: string;
+  value: string;
+}
+
+/**
+ * Extract color swatches from a theme registry item
+ * Returns an array of color swatches with variable names and values
+ */
+export function extractColorSwatches(
+  registryItem: ThemeRegistryItem,
+  mode: "light" | "dark" = "light",
+): ColorSwatch[] {
+  const colors: ColorSwatch[] = [];
+  const modeVars = registryItem.cssVars[mode] || {};
+  const usedValues = new Set<string>();
+
+  // Priority order for color extraction
+  const colorKeys = [
+    "background",
+    "foreground",
+    "primary",
+    "secondary",
+    "accent",
+    "muted",
+    "destructive",
+    "border",
+    "ring",
+    "card",
+    "popover",
+  ];
+
+  for (const key of colorKeys) {
+    if (modeVars[key] && !usedValues.has(modeVars[key])) {
+      colors.push({ name: key, value: modeVars[key] });
+      usedValues.add(modeVars[key]);
+    }
+  }
+
+  // If we don't have enough colors, add any remaining color variables
+  if (colors.length < 8) {
+    for (const [key, value] of Object.entries(modeVars)) {
+      if (
+        !usedValues.has(value) &&
+        !key.startsWith("font-") &&
+        !key.startsWith("radius") &&
+        !key.startsWith("shadow") &&
+        !key.startsWith("tracking-") &&
+        !key.startsWith("spacing")
+      ) {
+        colors.push({ name: key, value });
+        usedValues.add(value);
+        if (colors.length >= 8) break;
+      }
+    }
+  }
+
+  return colors.slice(0, 8); // Return up to 8 colors
 }

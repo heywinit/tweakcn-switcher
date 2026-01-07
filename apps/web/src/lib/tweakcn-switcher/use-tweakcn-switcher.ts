@@ -24,12 +24,17 @@ export interface UseTweakcnSwitcherReturn {
   removeTheme: (themeId: string) => void;
   mode: "light" | "dark";
   setMode: (mode: "light" | "dark") => void;
+  favorites: string[];
+  toggleFavorite: (themeId: string) => void;
+  isFavorite: (themeId: string) => boolean;
 }
 
 const DEFAULT_STORAGE_KEY = "tweakcn-switcher-theme";
+const DEFAULT_FAVORITES_KEY = "tweakcn-switcher-favorites";
 
 export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweakcnSwitcherReturn {
   const { defaultThemes = [], persist = true, storageKey = DEFAULT_STORAGE_KEY } = config;
+  const favoritesKey = `${storageKey}-favorites`;
 
   const [themes, setThemes] = useState<ThemeOption[]>(defaultThemes);
   const [currentTheme, setCurrentTheme] = useState<ThemeOption | null>(null);
@@ -37,6 +42,19 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"light" | "dark">("light");
   const [currentRegistryItem, setCurrentRegistryItem] = useState<ThemeRegistryItem | null>(null);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (persist && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(favoritesKey);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error("Failed to load favorites:", e);
+      }
+    }
+    return [];
+  });
   const isInitialMount = useRef(true);
   const modeRef = useRef(mode);
   const isApplyingRef = useRef(false);
@@ -289,6 +307,35 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     setMode(newMode);
   }, []);
 
+  const toggleFavorite = useCallback(
+    (themeId: string) => {
+      setFavorites((prev) => {
+        const newFavorites = prev.includes(themeId)
+          ? prev.filter((id) => id !== themeId)
+          : [...prev, themeId];
+
+        // Persist favorites
+        if (persist && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(favoritesKey, JSON.stringify(newFavorites));
+          } catch (e) {
+            console.error("Failed to save favorites:", e);
+          }
+        }
+
+        return newFavorites;
+      });
+    },
+    [persist, favoritesKey],
+  );
+
+  const isFavorite = useCallback(
+    (themeId: string) => {
+      return favorites.includes(themeId);
+    },
+    [favorites],
+  );
+
   return {
     currentTheme,
     themes,
@@ -300,5 +347,8 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     removeTheme,
     mode,
     setMode: handleSetMode,
+    favorites,
+    toggleFavorite,
+    isFavorite,
   };
 }

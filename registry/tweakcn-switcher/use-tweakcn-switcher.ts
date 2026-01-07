@@ -2,9 +2,16 @@
  * Hook for managing shadcn/ui theme switching
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { ThemeRegistryItem, ThemeOption, TweakcnSwitcherConfig } from "./types";
-import { applyThemeFromRegistry, fetchThemeFromUrl, extractThemeNameFromUrl } from "./utils";
+import {
+  applyThemeFromRegistry,
+  fetchThemeFromUrl,
+  extractThemeNameFromUrl,
+  validateUrl,
+  parseCssToThemeRegistryItem,
+  isCssCode,
+} from "./utils";
 
 export interface UseTweakcnSwitcherReturn {
   currentTheme: ThemeOption | null;
@@ -17,12 +24,17 @@ export interface UseTweakcnSwitcherReturn {
   removeTheme: (themeId: string) => void;
   mode: "light" | "dark";
   setMode: (mode: "light" | "dark") => void;
+  favorites: string[];
+  toggleFavorite: (themeId: string) => void;
+  isFavorite: (themeId: string) => boolean;
 }
 
 const DEFAULT_STORAGE_KEY = "tweakcn-switcher-theme";
+const DEFAULT_FAVORITES_KEY = "tweakcn-switcher-favorites";
 
 export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweakcnSwitcherReturn {
   const { defaultThemes = [], persist = true, storageKey = DEFAULT_STORAGE_KEY } = config;
+  const favoritesKey = `${storageKey}-favorites`;
 
   const [themes, setThemes] = useState<ThemeOption[]>(defaultThemes);
   const [currentTheme, setCurrentTheme] = useState<ThemeOption | null>(null);
@@ -30,40 +42,96 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"light" | "dark">("light");
   const [currentRegistryItem, setCurrentRegistryItem] = useState<ThemeRegistryItem | null>(null);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (persist && typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(favoritesKey);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error("Failed to load favorites:", e);
+      }
+    }
+    return [];
+  });
+  const isInitialMount = useRef(true);
+  const modeRef = useRef(mode);
+  const isApplyingRef = useRef(false);
+
+  // Keep modeRef in sync with mode state
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const applyTheme = useCallback(
-    async (url: string) => {
+    async (urlOrCss: string, overrideMode?: "light" | "dark") => {
+      // Prevent concurrent theme applications
+      if (isApplyingRef.current) {
+        return;
+      }
+      isApplyingRef.current = true;
       setIsLoading(true);
       setError(null);
 
       try {
-        const registryItem = await fetchThemeFromUrl(url);
-        setCurrentRegistryItem(registryItem);
-        await applyThemeFromRegistry(registryItem, mode);
+        let registryItem: ThemeRegistryItem;
+        let themeName: string;
+        let themeId: string;
+        let themeOption: ThemeOption;
 
-        // Find or create theme option
-        const themeName = registryItem.name || extractThemeNameFromUrl(url);
-        const themeId = `theme-${themeName}`;
+        if (isCssCode(urlOrCss)) {
+          // Handle CSS code
+          registryItem = parseCssToThemeRegistryItem(urlOrCss, "custom-css-theme");
+          themeName = registryItem.name;
+          themeId = `css-theme-${Date.now()}`;
+
+          themeOption = {
+            id: themeId,
+            name: themeName,
+            css: urlOrCss,
+          };
+        } else {
+          // Handle URL
+          registryItem = await fetchThemeFromUrl(urlOrCss);
+          themeName = registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          themeId = `theme-${themeName}`;
+
+          themeOption = {
+            id: themeId,
+            name: themeName,
+            url: urlOrCss,
+          };
+        }
+
+        setCurrentRegistryItem(registryItem);
+        const currentMode = overrideMode ?? modeRef.current;
+        await applyThemeFromRegistry(registryItem, currentMode);
 
         setThemes((prev) => {
-          let themeOption = prev.find((t) => t.url === url);
-          if (!themeOption) {
-            themeOption = {
-              id: themeId,
-              name: themeName,
-              url,
-            };
+          // Check if theme already exists (by URL or CSS content)
+          const existing = prev.find(
+            (t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss),
+          );
+          if (!existing) {
             const updated = [...prev, themeOption];
             setCurrentTheme(themeOption);
             return updated;
           }
-          setCurrentTheme(themeOption);
+          setCurrentTheme(existing);
           return prev;
         });
 
         // Persist if enabled
         if (persist) {
-          localStorage.setItem(storageKey, JSON.stringify({ url, mode, name: themeName }));
+          localStorage.setItem(
+            storageKey,
+            JSON.stringify({
+              ...(isCssCode(urlOrCss) ? { css: urlOrCss } : { url: urlOrCss }),
+              mode: currentMode,
+              name: themeName,
+            }),
+          );
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Failed to apply theme";
@@ -71,14 +139,16 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
         console.error("Failed to apply theme:", err);
       } finally {
         setIsLoading(false);
+        isApplyingRef.current = false;
       }
     },
-    [mode, persist, storageKey],
+    [persist, storageKey],
   );
 
-  // Load persisted theme on mount
+  // Load persisted theme on mount only
   useEffect(() => {
-    if (persist) {
+    if (persist && isInitialMount.current) {
+      isInitialMount.current = false;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         try {
@@ -86,15 +156,38 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
           if (savedTheme.mode) {
             setMode(savedTheme.mode);
           }
-          if (savedTheme.url) {
-            // Apply theme after mode is set
-            setTimeout(() => {
-              applyTheme(savedTheme.url).catch(console.error);
-            }, 0);
+          if (savedTheme.url || savedTheme.css) {
+            if (savedTheme.css) {
+              // Apply CSS theme
+              applyTheme(savedTheme.css, savedTheme.mode).catch((err) => {
+                console.error("Failed to load saved theme:", err);
+                // Clear invalid saved theme
+                localStorage.removeItem(storageKey);
+              });
+            } else if (savedTheme.url) {
+              // Validate URL before attempting to apply
+              const validation = validateUrl(savedTheme.url);
+              if (validation.valid) {
+                // Apply theme with the saved mode
+                applyTheme(savedTheme.url, savedTheme.mode).catch((err) => {
+                  console.error("Failed to load saved theme:", err);
+                  // Clear invalid saved theme
+                  localStorage.removeItem(storageKey);
+                });
+              } else {
+                // Clear invalid saved theme
+                console.warn("Invalid saved theme URL, clearing:", validation.error);
+                localStorage.removeItem(storageKey);
+              }
+            }
           }
         } catch (e) {
           console.error("Failed to load saved theme:", e);
+          // Clear corrupted saved theme
+          localStorage.removeItem(storageKey);
         }
+      } else {
+        isInitialMount.current = false;
       }
     }
   }, [persist, storageKey, applyTheme]);
@@ -103,42 +196,98 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
   useEffect(() => {
     if (currentRegistryItem) {
       applyThemeFromRegistry(currentRegistryItem, mode).catch(console.error);
+      // Update localStorage with new mode if persist is enabled
+      if (persist && currentTheme) {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const savedTheme = JSON.parse(saved);
+            localStorage.setItem(
+              storageKey,
+              JSON.stringify({
+                ...savedTheme,
+                mode,
+                ...(currentTheme.css ? { css: currentTheme.css } : {}),
+                ...(currentTheme.url ? { url: currentTheme.url } : {}),
+              }),
+            );
+          } catch (e) {
+            console.error("Failed to update saved theme mode:", e);
+          }
+        }
+      }
     }
-  }, [mode, currentRegistryItem]);
+  }, [mode, currentRegistryItem, persist, storageKey, currentTheme]);
 
   const applyThemeOption = useCallback(
     async (theme: ThemeOption) => {
-      await applyTheme(theme.url);
+      // Prevent applying the same theme if it's already the current theme
+      if (currentTheme?.id === theme.id) {
+        return;
+      }
+      // Prevent applying if already loading or applying
+      if (isLoading || isApplyingRef.current) {
+        return;
+      }
+      if (theme.css) {
+        await applyTheme(theme.css);
+      } else if (theme.url) {
+        await applyTheme(theme.url);
+      }
     },
-    [applyTheme],
+    [applyTheme, currentTheme, isLoading],
   );
 
-  const addTheme = useCallback(async (url: string, name?: string): Promise<ThemeOption | null> => {
-    try {
-      const registryItem = await fetchThemeFromUrl(url);
-      const themeName = name || registryItem.name || extractThemeNameFromUrl(url);
-      const themeId = `theme-${themeName}`;
+  const addTheme = useCallback(
+    async (urlOrCss: string, name?: string): Promise<ThemeOption | null> => {
+      setError(null); // Clear any previous errors
+      try {
+        let registryItem: ThemeRegistryItem;
+        let themeName: string;
+        let themeId: string;
+        let newTheme: ThemeOption;
 
-      const newTheme: ThemeOption = {
-        id: themeId,
-        name: themeName,
-        url,
-      };
+        if (isCssCode(urlOrCss)) {
+          // Handle CSS code
+          registryItem = parseCssToThemeRegistryItem(urlOrCss, name || "custom-css-theme");
+          themeName = name || registryItem.name;
+          themeId = `css-theme-${Date.now()}`;
 
-      setThemes((prev) => {
-        if (prev.some((t) => t.url === url)) {
-          return prev;
+          newTheme = {
+            id: themeId,
+            name: themeName,
+            css: urlOrCss,
+          };
+        } else {
+          // Handle URL
+          registryItem = await fetchThemeFromUrl(urlOrCss);
+          themeName = name || registryItem.name || extractThemeNameFromUrl(urlOrCss);
+          themeId = `theme-${themeName}`;
+
+          newTheme = {
+            id: themeId,
+            name: themeName,
+            url: urlOrCss,
+          };
         }
-        return [...prev, newTheme];
-      });
 
-      return newTheme;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to add theme";
-      setError(errorMessage);
-      throw err;
-    }
-  }, []);
+        setThemes((prev) => {
+          // Check if theme already exists (by URL or CSS content)
+          if (prev.some((t) => (t.url && t.url === urlOrCss) || (t.css && t.css === urlOrCss))) {
+            return prev;
+          }
+          return [...prev, newTheme];
+        });
+
+        return newTheme;
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to add theme";
+        setError(errorMessage);
+        throw err;
+      }
+    },
+    [],
+  );
 
   const removeTheme = useCallback(
     (themeId: string) => {
@@ -154,6 +303,39 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     [currentTheme, persist, storageKey],
   );
 
+  const handleSetMode = useCallback((newMode: "light" | "dark") => {
+    setMode(newMode);
+  }, []);
+
+  const toggleFavorite = useCallback(
+    (themeId: string) => {
+      setFavorites((prev) => {
+        const newFavorites = prev.includes(themeId)
+          ? prev.filter((id) => id !== themeId)
+          : [...prev, themeId];
+
+        // Persist favorites
+        if (persist && typeof window !== "undefined") {
+          try {
+            localStorage.setItem(favoritesKey, JSON.stringify(newFavorites));
+          } catch (e) {
+            console.error("Failed to save favorites:", e);
+          }
+        }
+
+        return newFavorites;
+      });
+    },
+    [persist, favoritesKey],
+  );
+
+  const isFavorite = useCallback(
+    (themeId: string) => {
+      return favorites.includes(themeId);
+    },
+    [favorites],
+  );
+
   return {
     currentTheme,
     themes,
@@ -164,6 +346,9 @@ export function useTweakcnSwitcher(config: TweakcnSwitcherConfig = {}): UseTweak
     addTheme,
     removeTheme,
     mode,
-    setMode,
+    setMode: handleSetMode,
+    favorites,
+    toggleFavorite,
+    isFavorite,
   };
 }
